@@ -1,84 +1,72 @@
 ﻿
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System.IO;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace aiRobots
 {
     public class JSON_db
     {
-        // 創建新的路徑並設置值
-        private JToken createNewParameterPath(JObject jsonObject, string parameter_path)
+        private JsonSerializerOptions options = new JsonSerializerOptions
         {
-            // 分割路徑
-            string[] pathParts = parameter_path.Split('.');
+            WriteIndented = true
+        };
 
-            // 用於建立路徑的遞迴方法
-            JToken CreatePath(JToken node, int index)
+        public T GetValue<T>(string path, string db_path = "./db.json")
+        {
+            string json = File.ReadAllText(db_path);
+            JsonDocument doc = JsonDocument.Parse(json);
+
+            string[] pathSegments = path.Split('.');
+
+            JsonElement element = doc.RootElement;
+            foreach (var segment in pathSegments)
             {
-                if (index >= pathParts.Length)
+                if (element.TryGetProperty(segment, out JsonElement subElement))
                 {
-                    return node;
-                }
-
-                // 確保物件存在
-                if (node is JObject obj)
-                {
-                    string pathPart = pathParts[index];
-
-                    // 如果當前層次不存在這個屬性，則創建它
-                    if (obj.TryGetValue(pathPart, out JToken child))
-                    {
-                        // 子屬性已存在，遞迴進入下一層
-                        return CreatePath(child, index + 1);
-                    }
-                    else
-                    {
-                        // 子屬性不存在，創建新的子屬性並遞迴進入下一層
-                        JToken newChild = new JObject();
-                        obj.Add(pathPart, newChild);
-                        return CreatePath(newChild, index + 1);
-                    }
+                    element = subElement;
                 }
                 else
                 {
-                    // 如果當前節點不是物件，無法創建子屬性，則拋出異常
-                    throw new InvalidOperationException($"Invalid JSON path at {string.Join(".", pathParts, 0, index)}");
+                    throw new InvalidOperationException($"Path not found: {path}");
                 }
             }
 
-            // 開始遞迴創建路徑
-            CreatePath(jsonObject, 0);
-
-            return jsonObject.SelectToken(parameter_path);
+            return JsonSerializer.Deserialize<T>(element.GetRawText());
         }
 
-        public void Save(int value, string database_path = @"./db.json", string parameter_path = @"data")
+        public void SetValue<T>(string path, T value, string db_path = "./db.json")
         {
-            string jsonContent = "{}";
-            if (File.Exists(database_path))
+            string json = File.ReadAllText(db_path);
+            JsonNode rootNode = JsonNode.Parse(json);
+
+            JsonNode currentNode = rootNode;
+
+            string[] pathSegments = path.Split('.');
+
+            // 遍歷路徑，直到倒數第二個元素
+            for (int i = 0; i < pathSegments.Length - 1; i++)
             {
-                // Read the json file content to the string
-                jsonContent = File.ReadAllText(database_path);
+                string segment = pathSegments[i];
+
+                if (currentNode is JsonObject obj && obj.ContainsKey(segment))
+                {
+                    currentNode = obj[segment];
+                }
+                else
+                {
+                    // 如果中間某個節點不存在，則建立新的節點
+                    JsonObject newNode = new JsonObject();
+                    currentNode[segment] = newNode;
+                    currentNode = newNode;
+                }
             }
 
-            // 將JSON字串轉換成JObject物件
-            JObject jsonObject = JObject.Parse(jsonContent);
-            //var jsonObject = JsonConvert.DeserializeObject<JObject>(jsonContent);
+            // 將倒數第一個節點設置為新值
+            currentNode[pathSegments[^1]] = JsonNode.Parse(JsonSerializer.Serialize(value));
 
-            var token = jsonObject.SelectToken(parameter_path);
-            if (token == null)
-            {
-                token = this.createNewParameterPath(jsonObject, parameter_path);
-            }
-
-            // 將JToken設定到指定路徑
-            token.Replace(value);
-
-            string modifiedJsonContent = jsonObject.ToString(formatting: Formatting.Indented);
-
-            // 將修改後的內容寫回JSON檔案中
-            File.WriteAllText(database_path, modifiedJsonContent);
+            // 將修改後的 JSON 寫入配置文件
+            string modifiedJson = rootNode.ToJsonString(options);
+            File.WriteAllText(db_path, modifiedJson);
         }
     }
 }
