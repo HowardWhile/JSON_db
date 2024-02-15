@@ -48,7 +48,7 @@ namespace aiRobots
             {
                 string segment = pathSegments[i];
 
-                if (currentNode is JsonObject obj && obj.ContainsKey(segment))
+                if (currentNode is JsonObject obj && obj.ContainsKey(segment) && obj[segment].GetValueKind() == JsonValueKind.Object)
                 {
                     currentNode = obj[segment];
                 }
