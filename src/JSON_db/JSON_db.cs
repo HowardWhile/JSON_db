@@ -34,11 +34,17 @@ namespace aiRobots
             return JsonSerializer.Deserialize<T>(element.GetRawText());
         }
 
-        public void SetValue<T>(string path, T value, string db_path = "./db.json")
+        public void SetValue<T>(string path, T value, string comment = "", string db_path = "./db.json")
         {
-            string json = File.ReadAllText(db_path);
-            JsonNode rootNode = JsonNode.Parse(json);
-
+            JsonNode rootNode = new JsonObject();
+            try
+            {
+                string json = File.ReadAllText(db_path);
+                rootNode = JsonNode.Parse(json);
+            }
+            catch (Exception)
+            {
+            }
             JsonNode currentNode = rootNode;
 
             string[] pathSegments = path.Split('.');
@@ -48,7 +54,7 @@ namespace aiRobots
             {
                 string segment = pathSegments[i];
 
-                if (currentNode is JsonObject obj && obj.ContainsKey(segment) && obj[segment].GetValueKind() == JsonValueKind.Object)
+                if (currentNode is JsonObject obj && obj[segment].GetValueKind() == JsonValueKind.Object)
                 {
                     currentNode = obj[segment];
                 }
@@ -62,7 +68,22 @@ namespace aiRobots
             }
 
             // 將倒數第一個節點設置為新值
-            currentNode[pathSegments[^1]] = JsonNode.Parse(JsonSerializer.Serialize(value));
+            var last_segment = pathSegments[^1];
+            currentNode[last_segment] = JsonNode.Parse(JsonSerializer.Serialize(value));
+
+            // 設置節點的註解
+            if (comment != "")
+            { 
+                currentNode[$"#{last_segment}"] = comment;
+            }
+            else
+            {
+                if (currentNode is JsonObject obj && obj.ContainsKey($"#{last_segment}"))
+                {
+                    // 移除 註解
+                    obj.Remove($"#{last_segment}");
+                }
+            }            
 
             // 將修改後的 JSON 寫入配置文件
             string modifiedJson = rootNode.ToJsonString(options);
