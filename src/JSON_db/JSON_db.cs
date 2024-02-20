@@ -60,68 +60,57 @@ namespace aiRobots
 
             // 將當前節點的值反序列化為指定的類型 T
             return JsonSerializer.Deserialize<T>(currentNode.ToJsonString());
-        }        
-
-        private void Remove(string path, ref JsonNode db_node)
-        {
-            JsonNode currentNode = db_node;
-
-            // 遍歷 JSON 結構，直到目標節點的父節點
-            string[] pathSegments = path.Split('.');
-            for (int i = 0; i < pathSegments.Length - 1; i++)
-            {
-                string segment = pathSegments[i];
-
-                // 確認節點存在且為 JsonObject
-                if (currentNode is JsonObject obj && obj.ContainsKey(segment) && obj[segment] is JsonObject)
-                {
-                    // 移動到下一個節點
-                    currentNode = obj[segment];
-                }
-                else
-                {
-                    // 如果某個節點不存在，不須移除，直接返回
-                    return;
-                }
-            }
-
-            var last_segment = pathSegments[^1];
-            if (currentNode is JsonObject last_obj && last_obj.ContainsKey(last_segment))
-            {
-                last_obj.Remove(last_segment);
-            }
-            return;
         }
-        private void Remove(string path, string db_path = "./db.json")
+        
+        public void SetComment(string path, string comment = "", string db_file = "./db.json")
         {
             JsonNode rootNode = new JsonObject();
             try
             {
-                string json = File.ReadAllText(db_path);
+                string json = File.ReadAllText(db_file);
                 rootNode = JsonNode.Parse(json);
             }
             catch (Exception)
             {
             }
 
-            this.Remove(path, ref rootNode);
+            this.SetComment(path, comment, ref rootNode);
 
-            // 將修改後的 JSON 寫回到文件中
             string modifiedJson = rootNode.ToJsonString(options);
-            File.WriteAllText(db_path, modifiedJson);
+            File.WriteAllText(db_file, modifiedJson);
         }
-        public void SetValue<T>(string path, T value, string comment = "", string db_file = "./db.json")
+
+        public void SetComment(string path, string comment, ref JsonNode db_node)
         {
             if (comment != "")
             {
-                this.SetValue($"{path}.#", comment, db_file);
+                this.SetValue($"{path}.#", comment, ref db_node);
             }
             else
             {
-                this.Remove($"{path}.#");
+                this.remove($"{path}.#", ref db_node);
+            }
+        }
+
+        public void SetValue<T>(string path, T value, string comment = "", string db_file = "./db.json")
+        {
+            JsonNode rootNode = new JsonObject();
+            try
+            {
+                string json = File.ReadAllText(db_file);
+                rootNode = JsonNode.Parse(json);
+            }
+            catch (Exception)
+            {
             }
 
-            this.SetValue($"{path}.value", value, db_file);
+
+            // 將修改後的 JSON 寫入配置文件
+            this.SetValue($"{path}.value", value, ref rootNode);
+            this.SetComment(path, comment, ref rootNode);
+
+            string modifiedJson = rootNode.ToJsonString(options);
+            File.WriteAllText(db_file, modifiedJson);
         }
 
         public void SetValue<T>(string path, T value, ref JsonNode db_node)
@@ -151,8 +140,11 @@ namespace aiRobots
             var last_segment = pathSegments[^1];
             currentNode[last_segment] = JsonNode.Parse(JsonSerializer.Serialize(value));
         }
-
-        public void SetValue<T>(string path, T value, string db_path = "./db.json")
+        /* --------------------------------------------------- */
+        // private
+        /* --------------------------------------------------- */
+        // remove path
+        private void remove(string path, string db_path)
         {
             JsonNode rootNode = new JsonObject();
             try
@@ -164,11 +156,42 @@ namespace aiRobots
             {
             }
 
-            this.SetValue(path, value, ref rootNode);                
+            this.remove(path, ref rootNode);
 
-            // 將修改後的 JSON 寫入配置文件
+            // 將修改後的 JSON 寫回到文件中
             string modifiedJson = rootNode.ToJsonString(options);
             File.WriteAllText(db_path, modifiedJson);
         }
+        private void remove(string path, ref JsonNode db_node)
+        {
+            JsonNode currentNode = db_node;
+
+            // 遍歷 JSON 結構，直到目標節點的父節點
+            string[] pathSegments = path.Split('.');
+            for (int i = 0; i < pathSegments.Length - 1; i++)
+            {
+                string segment = pathSegments[i];
+
+                // 確認節點存在且為 JsonObject
+                if (currentNode is JsonObject obj && obj.ContainsKey(segment) && obj[segment] is JsonObject)
+                {
+                    // 移動到下一個節點
+                    currentNode = obj[segment];
+                }
+                else
+                {
+                    // 如果某個節點不存在，不須移除，直接返回
+                    return;
+                }
+            }
+
+            var last_segment = pathSegments[^1];
+            if (currentNode is JsonObject last_obj && last_obj.ContainsKey(last_segment))
+            {
+                last_obj.Remove(last_segment);
+            }
+            return;
+        }
+
     }
 }
