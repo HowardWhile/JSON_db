@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="JsonPath.Net" Version="0.8.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\JSON_db\JSON_db.csproj" />
   </ItemGroup>
 

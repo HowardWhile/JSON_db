@@ -1,8 +1,17 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
-using System.Text.Json.Nodes;
+
+using Json.Path;
 
 aiRobots.JSON_db db_tool = new aiRobots.JSON_db();
+
+//db_tool.SetValue("$['path'].to", 111);
+//db_tool.SetValue("$.path.to", 222);
+//db_tool.SetValue("path.to", 333);
+//db_tool.SetValue("$path.to", 444); //x
+//db_tool.SetValue("['path'].to", 555); 
+db_tool.SetValue("path.to.arr[3]", 666);
+
 
 // set data
 db_tool.SetValue("Int_Data", 100);

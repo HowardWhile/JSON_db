@@ -1,5 +1,8 @@
 ﻿
+using Json.Path;
 using Newtonsoft.Json.Linq;
+using System;
+using System.IO;
 
 namespace aiRobots
 {
@@ -16,11 +19,11 @@ namespace aiRobots
         {
             JToken rootNode = new JObject(); // {}
             //JToken rootNode = new JArray(); // []
-
+            
             try
             {
                 string json = File.ReadAllText(db_file);
-                rootNode = JObject.Parse(json);
+                rootNode = JToken.Parse(json);
             }
             catch (Exception)
             {
@@ -107,55 +110,86 @@ namespace aiRobots
             JToken token = db_node.SelectToken(json_path);
             if (token == null)
             {
-                // 如果找不到指定路徑的 token，則創建對應的結構並設置值
-                createTokenAtPath(json_path, value, db_node);
-            }
-            else
-            {
-                // 如果找到了 token，則將其值替換為新的值
-                token.Replace(JToken.FromObject(value));
-            }
+                // 確認 JSON Path 字串是否包含 $ 前綴，如果沒有則添加
+                if(json_path.StartsWith("["))
+                    json_path = $"${json_path}";
+                if (!json_path.StartsWith("$")) 
+                    json_path = $"$.{json_path}";
 
-        }
+                JToken jpart_parent = "$";
 
-        private void createTokenAtPath<T>(string json_path, T value, JToken db_node)
-        {
-            // 解析路徑
-            JToken parentNode = db_node;
-            string[] pathSegments = json_path.Split('.');
-            foreach (var segment in pathSegments)
-            {
-                // 確定父節點的類型
-                if (parentNode is JObject)
+                // 如果找不到指定路徑的 token，則創建對應的結構
+                dynamic jpart = db_node;
+                var jPath = JsonPath.Parse(json_path);
+                
+                foreach (var part in jPath.Segments)
                 {
-                    JObject obj = (JObject)parentNode;
-                    if (!obj.ContainsKey(segment))
+                    if (part.IsShorthand) 
                     {
-                        // 如果父節點中不包含該段落，則創建一個新的 JsonObject
-                        obj[segment] = new JObject();
-                    }
-                    // 更新父節點為新創建的節點
-                    parentNode = obj[segment];
-                }
-                else if (parentNode is JArray)
-                {
-                    JArray arr = (JArray)parentNode;
-                    // 獲取索引值
-                    int index = int.Parse(segment.Trim('[', ']'));
-                    // 確認索引值是否在範圍內
-                    if (index >= 0 && index < arr.Count)
-                    {
-                        parentNode = arr[index];
+                        // (e.g. `.foo` instead of `['foo']`) 簡寫(.foo)一般都當作object的key
+                        var segmnet_name = part.ToString().Trim('.');
+                        // 不存在就建立
+                        if (jpart[segmnet_name] == null)
+                            jpart.Add(new JProperty(segmnet_name, new JObject()));
+
+                        jpart_parent = jpart;
+                        jpart = jpart[segmnet_name];
+
                     }
                     else
                     {
-                        throw new InvalidOperationException($"Index out of range: {index}");
+                        // 檢查part是array還是當作object的key
+                        if(this.tryParseArrayIndex(part.ToString(), out int array_index))
+                        {
+                            // 是array的index
+                            if(!(jpart_parent.Type == JTokenType.Array))
+                            {
+                                jpart = new JArray();
+                            }
+                            else 
+                            {
+
+                            }
+
+                            if (jpart[array_index] == null)
+                            {
+                                var new_array = new JArray();
+                                while (new_array.Count < array_index)
+                                {
+                                    new_array.Add(null);
+                                }
+                                jpart.Add(new JArray(new_array));
+                            }
+
+                            jpart_parent = jpart;
+                            jpart = jpart[array_index];
+                        }
+                        else
+                        {
+                            // 不是array
+                            // 不存在就建立
+                            var segmnet_name = part.ToString().Trim('[', ']', '\'');
+
+                            if (jpart[segmnet_name] == null)
+                                jpart.Add(new JProperty(segmnet_name, new JObject()));
+
+                            jpart_parent = jpart;
+                            jpart = jpart[segmnet_name];
+                        }
                     }
                 }
+                token = jpart;
             }
+            
+            // 如果找到了 token，則將其值替換為新的值
+            token.Replace(JToken.FromObject(value));
+        }
 
-            // 將值設置到最終節點
-            parentNode.Replace(JToken.FromObject(value));
+        
+
+        private bool tryParseArrayIndex(string part, out int index)
+        {
+            return int.TryParse(part.Trim('[', ']'), out index);
         }
 
         // remove json_path
