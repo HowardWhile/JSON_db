@@ -1,197 +1,212 @@
 ﻿
-using System.Text.Json;
-using System.Text.Json.Nodes;
+using Newtonsoft.Json.Linq;
 
 namespace aiRobots
 {
     public class JSON_db
     {
-        private JsonSerializerOptions options = new JsonSerializerOptions
-        {
-            WriteIndented = true
-        };
-
         public T GetValue<T>(string path, string db_path = "./db.json")
         {
             string json = File.ReadAllText(db_path);
-            JsonNode rootNode = JsonNode.Parse(json);
+            JObject jObject = JObject.Parse(json);
 
-            return this.getValue<T>($"{path}.value", rootNode);
+            return this.getValue<T>($"{path}.value", jObject);
         }
-
-        public (T, string) GetValueComment<T>(string path, string db_path = "./db.json")
-        {
-            string json = File.ReadAllText(db_path);
-            JsonNode rootNode = JsonNode.Parse(json);
-
-            T r_value = this.getValue<T>($"{path}.value", rootNode);
-
-            string r_comment = "";
-            try
-            {
-                r_comment = this.getValue<string>($"{path}.#", rootNode);
-            }
-            catch (Exception)
-            {
-
-            }
-
-            return (r_value, r_comment);
-        }
-
-        private T getValue<T>(string path, JsonNode db_node)
-        {
-            string[] pathSegments = path.Split('.');
-
-            JsonNode currentNode = db_node;
-            foreach (var segment in pathSegments)
-            {
-                // 確認當前節點是 JsonObject 並且包含指定的屬性
-                if (currentNode is JsonObject obj && obj.ContainsKey(segment))
-                {
-                    // 移動到下一個節點
-                    currentNode = obj[segment];
-                }
-                else
-                {
-                    throw new InvalidOperationException($"Path not found: {path}");
-                }
-            }
-
-            // 將當前節點的值反序列化為指定的類型 T
-            return JsonSerializer.Deserialize<T>(currentNode.ToJsonString());
-        }
-        
-        public void SetComment(string path, string comment = "", string db_file = "./db.json")
-        {
-            JsonNode rootNode = new JsonObject();
-            try
-            {
-                string json = File.ReadAllText(db_file);
-                rootNode = JsonNode.Parse(json);
-            }
-            catch (Exception)
-            {
-            }
-
-            this.SetComment(path, comment, ref rootNode);
-
-            string modifiedJson = rootNode.ToJsonString(options);
-            File.WriteAllText(db_file, modifiedJson);
-        }
-
-        public void SetComment(string path, string comment, ref JsonNode db_node)
-        {
-            if (comment != "")
-            {
-                this.setValue($"{path}.#", comment, ref db_node);
-            }
-            else
-            {
-                this.remove($"{path}.#", ref db_node);
-            }
-        }
-
         public void SetValue<T>(string path, T value, string comment = "", string db_file = "./db.json")
         {
-            JsonNode rootNode = new JsonObject();
+            JToken rootNode = new JObject(); // {}
+            //JToken rootNode = new JArray(); // []
+
             try
             {
                 string json = File.ReadAllText(db_file);
-                rootNode = JsonNode.Parse(json);
+                rootNode = JObject.Parse(json);
             }
             catch (Exception)
             {
             }
 
+            this.setValue($"{path}.value", value, rootNode);
+            //this.SetComment(json_path, comment, ref rootNode);
 
             // 將修改後的 JSON 寫入配置文件
-            this.setValue($"{path}.value", value, ref rootNode);
-            this.SetComment(path, comment, ref rootNode);
-
-            string modifiedJson = rootNode.ToJsonString(options);
+            string modifiedJson = rootNode.ToString();
             File.WriteAllText(db_file, modifiedJson);
         }
 
-        private void setValue<T>(string path, T value, ref JsonNode db_node)
-        {
-            JsonNode currentNode = db_node;
-            string[] pathSegments = path.Split('.');
+        //public (T, string) GetValueComment<T>(string json_path, string db_path = "./db.json")
+        //{
+        //    string json = File.ReadAllText(db_path);
+        //    JObject rootNode = JObject.Parse(json);
 
-            // 遍歷路徑，直到倒數第二個元素
-            for (int i = 0; i < pathSegments.Length - 1; i++)
-            {
-                string segment = pathSegments[i];
+        //    T r_value = this.getValue<T>($"{json_path}.value", rootNode);
 
-                if (currentNode is JsonObject obj && obj.ContainsKey(segment) && obj[segment].GetValueKind() == JsonValueKind.Object)
-                {
-                    currentNode = obj[segment];
-                }
-                else
-                {
-                    // 如果中間某個節點不存在，則建立新的節點
-                    JsonObject newNode = new JsonObject();
-                    currentNode[segment] = newNode;
-                    currentNode = newNode;
-                }
-            }
+        //    string r_comment = "";
+        //    try
+        //    {
+        //        r_comment = this.getValue<string>($"{json_path}.#", rootNode);
+        //    }
+        //    catch (Exception)
+        //    {
 
-            // 將倒數第一個節點設置為新值
-            var last_segment = pathSegments[^1];
-            currentNode[last_segment] = JsonNode.Parse(JsonSerializer.Serialize(value));
-        }
+        //    }
+
+        //    return (r_value, r_comment);
+        //}
+
+
+        //public void SetComment(string json_path, string comment = "", string db_file = "./db.json")
+        //{
+        //    JsonNode rootNode = new JsonObject();
+        //    try
+        //    {
+        //        string json = File.ReadAllText(db_file);
+        //        rootNode = JsonNode.Parse(json);
+        //    }
+        //    catch (Exception)
+        //    {
+        //    }
+
+        //    this.SetComment(json_path, comment, ref rootNode);
+
+        //    string modifiedJson = rootNode.ToJsonString(options);
+        //    File.WriteAllText(db_file, modifiedJson);
+        //}
+
+        //public void SetComment(string json_path, string comment, ref JsonNode db_node)
+        //{
+        //    if (comment != "")
+        //    {
+        //        this.setValue($"{json_path}.#", comment, ref db_node);
+        //    }
+        //    else
+        //    {
+        //        this.remove($"{json_path}.#", ref db_node);
+        //    }
+        //}
+
+
+
         /* --------------------------------------------------- */
         // private
         /* --------------------------------------------------- */
-        // remove path
-        private void remove(string path, string db_path)
+        private T getValue<T>(string json_path, JToken db_node)
         {
-            JsonNode rootNode = new JsonObject();
-            try
+            JToken token = db_node.SelectToken(json_path);
+            if (token == null)
             {
-                string json = File.ReadAllText(db_path);
-                rootNode = JsonNode.Parse(json);
-            }
-            catch (Exception)
-            {
+                throw new InvalidOperationException($"JsonPath not found: {json_path}");
             }
 
-            this.remove(path, ref rootNode);
-
-            // 將修改後的 JSON 寫回到文件中
-            string modifiedJson = rootNode.ToJsonString(options);
-            File.WriteAllText(db_path, modifiedJson);
+            // 將 JSON 中的值轉換為指定的類型 T
+            return token.ToObject<T>();
         }
-        private void remove(string path, ref JsonNode db_node)
+
+        private void setValue<T>(string json_path, T value, JToken db_node)
         {
-            JsonNode currentNode = db_node;
-
-            // 遍歷 JSON 結構，直到目標節點的父節點
-            string[] pathSegments = path.Split('.');
-            for (int i = 0; i < pathSegments.Length - 1; i++)
+            JToken token = db_node.SelectToken(json_path);
+            if (token == null)
             {
-                string segment = pathSegments[i];
-
-                // 確認節點存在且為 JsonObject
-                if (currentNode is JsonObject obj && obj.ContainsKey(segment) && obj[segment] is JsonObject)
-                {
-                    // 移動到下一個節點
-                    currentNode = obj[segment];
-                }
-                else
-                {
-                    // 如果某個節點不存在，不須移除，直接返回
-                    return;
-                }
+                // 如果找不到指定路徑的 token，則創建對應的結構並設置值
+                createTokenAtPath(json_path, value, db_node);
+            }
+            else
+            {
+                // 如果找到了 token，則將其值替換為新的值
+                token.Replace(JToken.FromObject(value));
             }
 
-            var last_segment = pathSegments[^1];
-            if (currentNode is JsonObject last_obj && last_obj.ContainsKey(last_segment))
-            {
-                last_obj.Remove(last_segment);
-            }
-            return;
         }
+
+        private void createTokenAtPath<T>(string json_path, T value, JToken db_node)
+        {
+            // 解析路徑
+            JToken parentNode = db_node;
+            string[] pathSegments = json_path.Split('.');
+            foreach (var segment in pathSegments)
+            {
+                // 確定父節點的類型
+                if (parentNode is JObject)
+                {
+                    JObject obj = (JObject)parentNode;
+                    if (!obj.ContainsKey(segment))
+                    {
+                        // 如果父節點中不包含該段落，則創建一個新的 JsonObject
+                        obj[segment] = new JObject();
+                    }
+                    // 更新父節點為新創建的節點
+                    parentNode = obj[segment];
+                }
+                else if (parentNode is JArray)
+                {
+                    JArray arr = (JArray)parentNode;
+                    // 獲取索引值
+                    int index = int.Parse(segment.Trim('[', ']'));
+                    // 確認索引值是否在範圍內
+                    if (index >= 0 && index < arr.Count)
+                    {
+                        parentNode = arr[index];
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException($"Index out of range: {index}");
+                    }
+                }
+            }
+
+            // 將值設置到最終節點
+            parentNode.Replace(JToken.FromObject(value));
+        }
+
+        // remove json_path
+        //private void remove(string json_path, string db_path)
+        //{
+        //    JsonNode rootNode = new JsonObject();
+        //    try
+        //    {
+        //        string json = File.ReadAllText(db_path);
+        //        rootNode = JsonNode.Parse(json);
+        //    }
+        //    catch (Exception)
+        //    {
+        //    }
+
+        //    this.remove(json_path, ref rootNode);
+
+        //    // 將修改後的 JSON 寫回到文件中
+        //    string modifiedJson = rootNode.ToJsonString(options);
+        //    File.WriteAllText(db_path, modifiedJson);
+        //}
+        //private void remove(string json_path, ref JsonNode db_node)
+        //{
+        //    JsonNode currentNode = db_node;
+
+        //    // 遍歷 JSON 結構，直到目標節點的父節點
+        //    string[] pathSegments = json_path.Split('.');
+        //    for (int i = 0; i < pathSegments.Length - 1; i++)
+        //    {
+        //        string segment = pathSegments[i];
+
+        //        // 確認節點存在且為 JsonObject
+        //        if (currentNode is JsonObject obj && obj.ContainsKey(segment) && obj[segment] is JsonObject)
+        //        {
+        //            // 移動到下一個節點
+        //            currentNode = obj[segment];
+        //        }
+        //        else
+        //        {
+        //            // 如果某個節點不存在，不須移除，直接返回
+        //            return;
+        //        }
+        //    }
+
+        //    var last_segment = pathSegments[^1];
+        //    if (currentNode is JsonObject last_obj && last_obj.ContainsKey(last_segment))
+        //    {
+        //        last_obj.Remove(last_segment);
+        //    }
+        //    return;
+        //}
 
     }
 }
