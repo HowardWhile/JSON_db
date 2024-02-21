@@ -16,7 +16,7 @@ namespace aiRobots
             string json = File.ReadAllText(db_path);
             JsonNode rootNode = JsonNode.Parse(json);
 
-            return this.GetValue<T>(path, rootNode);
+            return this.getValue<T>($"{path}.value", rootNode);
         }
 
         public (T, string) GetValueComment<T>(string path, string db_path = "./db.json")
@@ -24,12 +24,12 @@ namespace aiRobots
             string json = File.ReadAllText(db_path);
             JsonNode rootNode = JsonNode.Parse(json);
 
-            T r_value = this.GetValue<T>($"{path}.value", rootNode);
+            T r_value = this.getValue<T>($"{path}.value", rootNode);
 
             string r_comment = "";
             try
             {
-                r_comment = this.GetValue<string>($"{path}.#", rootNode);
+                r_comment = this.getValue<string>($"{path}.#", rootNode);
             }
             catch (Exception)
             {
@@ -39,7 +39,7 @@ namespace aiRobots
             return (r_value, r_comment);
         }
 
-        public T GetValue<T>(string path, JsonNode db_node)
+        private T getValue<T>(string path, JsonNode db_node)
         {
             string[] pathSegments = path.Split('.');
 
@@ -84,7 +84,7 @@ namespace aiRobots
         {
             if (comment != "")
             {
-                this.SetValue($"{path}.#", comment, ref db_node);
+                this.setValue($"{path}.#", comment, ref db_node);
             }
             else
             {
@@ -106,14 +106,14 @@ namespace aiRobots
 
 
             // 將修改後的 JSON 寫入配置文件
-            this.SetValue($"{path}.value", value, ref rootNode);
+            this.setValue($"{path}.value", value, ref rootNode);
             this.SetComment(path, comment, ref rootNode);
 
             string modifiedJson = rootNode.ToJsonString(options);
             File.WriteAllText(db_file, modifiedJson);
         }
 
-        public void SetValue<T>(string path, T value, ref JsonNode db_node)
+        private void setValue<T>(string path, T value, ref JsonNode db_node)
         {
             JsonNode currentNode = db_node;
             string[] pathSegments = path.Split('.');
